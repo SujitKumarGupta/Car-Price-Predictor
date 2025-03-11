@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import plotly.express as px
 from utils.preprocessing import validate_input, prepare_input_data, format_price
+from utils.database import save_prediction, get_predictions, get_prediction_stats
 from datetime import datetime
 import os
 
@@ -20,10 +21,6 @@ def load_model():
     with open('model/car_price_model.pkl', 'rb') as f:
         return pickle.load(f)
 
-# Initialize session state for storing predictions
-if 'predictions' not in st.session_state:
-    st.session_state.predictions = []
-
 def main():
     st.title("🚗 Indian Car Price Predictor")
     st.markdown("Predict used car prices in Indian Rupees (₹)")
@@ -36,6 +33,14 @@ def main():
     except FileNotFoundError:
         st.error("Model not found. Please train the model first.")
         return
+
+    # Display prediction stats
+    stats = get_prediction_stats()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Predictions", stats['total_predictions'])
+    with col2:
+        st.metric("Average Predicted Price", format_price(stats['avg_price']))
 
     # Sidebar for inputs
     st.sidebar.header("Car Details")
@@ -67,31 +72,40 @@ def main():
             # Make prediction
             prediction = model.predict(input_scaled)[0]
 
-            # Store prediction with timestamp
-            st.session_state.predictions.append({
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            # Save prediction to MongoDB
+            prediction_data = {
+                'timestamp': datetime.now(),
                 'year': year,
                 'mileage': mileage,
                 'brand': brand,
                 'model': car_model,
                 'predicted_price': float(prediction)
-            })
+            }
+            save_prediction(prediction_data)
 
             # Display prediction
             st.success(f"Predicted Price: {format_price(prediction)}")
 
-    # Display previous predictions
-    if st.session_state.predictions:
-        st.header("Previous Predictions")
+    # Display previous predictions from MongoDB
+    st.header("Previous Predictions")
+    predictions = get_predictions()
 
-        # Convert predictions to DataFrame
-        df_predictions = pd.DataFrame(st.session_state.predictions)
+    if predictions:
+        # Convert to DataFrame
+        df_predictions = pd.DataFrame(predictions)
 
-        # Format price column for display
+        # Format for display
         df_predictions['predicted_price_formatted'] = df_predictions['predicted_price'].apply(format_price)
+        df_predictions['timestamp'] = pd.to_datetime(df_predictions['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Drop MongoDB _id column
+        df_predictions = df_predictions.drop('_id', axis=1)
 
         # Display as table
-        st.dataframe(df_predictions[['timestamp', 'year', 'mileage', 'brand', 'model', 'predicted_price_formatted']])
+        st.dataframe(
+            df_predictions[['timestamp', 'year', 'mileage', 'brand', 'model', 'predicted_price_formatted']],
+            hide_index=True
+        )
 
         # Create visualization
         fig = px.scatter(df_predictions, x='year', y='predicted_price',
@@ -100,11 +114,6 @@ def main():
                         title='Predictions Visualization (in ₹)',
                         labels={'predicted_price': 'Predicted Price (₹)'})
         st.plotly_chart(fig)
-
-        # Save predictions to CSV
-        if st.button("Save Predictions"):
-            df_predictions.to_csv('predictions.csv', index=False)
-            st.success("Predictions saved to predictions.csv")
 
 if __name__ == "__main__":
     main()

@@ -1,2 +1,2 @@
-timestamp,year,mileage,brand,model,predicted_price
-2025-03-11 03:48:10,2020,50000,Toyota,Sedan,33753.39
+timestamp,year,mileage,brand,model,predicted_price,predicted_price_formatted
+2025-03-11 03:51:08,2020,50000,Maruti Suzuki,Hatchback,3329253.99,"₹33,29,,253"
