@@ -4,7 +4,6 @@ import numpy as np
 import pickle
 import plotly.express as px
 from utils.preprocessing import validate_input, prepare_input_data, format_price
-from utils.database import save_prediction, get_predictions
 from datetime import datetime
 import os
 
@@ -20,6 +19,10 @@ st.set_page_config(
 def load_model():
     with open('model/car_price_model.pkl', 'rb') as f:
         return pickle.load(f)
+
+# Initialize session state for storing predictions
+if 'predictions' not in st.session_state:
+    st.session_state.predictions = []
 
 def main():
     st.title("🚗 Car Price Predictor")
@@ -57,33 +60,25 @@ def main():
             # Make prediction
             prediction = model.predict(input_scaled)[0]
 
-            # Create prediction record
-            prediction_data = {
+            # Store prediction with timestamp
+            st.session_state.predictions.append({
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'year': year,
                 'mileage': mileage,
                 'brand': brand,
                 'model': car_model,
                 'predicted_price': float(prediction)
-            }
-
-            # Save to MongoDB
-            save_prediction(prediction_data)
+            })
 
             # Display prediction
             st.success(f"Predicted Price: {format_price(prediction)}")
 
-    # Display previous predictions from MongoDB
-    st.header("Previous Predictions")
+    # Display previous predictions
+    if st.session_state.predictions:
+        st.header("Previous Predictions")
 
-    # Get predictions from MongoDB
-    predictions = get_predictions()
-    if predictions:
-        # Convert to DataFrame
-        df_predictions = pd.DataFrame(predictions)
-
-        # Drop MongoDB _id and format timestamp
-        df_predictions = df_predictions.drop('_id', axis=1)
-        df_predictions['timestamp'] = pd.to_datetime(df_predictions['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        # Convert predictions to DataFrame
+        df_predictions = pd.DataFrame(st.session_state.predictions)
 
         # Display as table
         st.dataframe(df_predictions)
@@ -94,6 +89,11 @@ def main():
                         hover_data=['model', 'timestamp'],
                         title='Predictions Visualization')
         st.plotly_chart(fig)
+
+        # Save predictions to CSV
+        if st.button("Save Predictions"):
+            df_predictions.to_csv('predictions.csv', index=False)
+            st.success("Predictions saved to predictions.csv")
 
 if __name__ == "__main__":
     main()
