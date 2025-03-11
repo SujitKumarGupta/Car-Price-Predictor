@@ -74,7 +74,6 @@ def main():
 
             # Save prediction to MongoDB
             prediction_data = {
-                'timestamp': datetime.now(),
                 'year': year,
                 'mileage': mileage,
                 'brand': brand,
@@ -86,20 +85,21 @@ def main():
             # Display prediction
             st.success(f"Predicted Price: {format_price(prediction)}")
 
-    # Display previous predictions from MongoDB
+    # Display previous predictions
     st.header("Previous Predictions")
     predictions = get_predictions()
 
     if predictions:
-        # Convert to DataFrame
+        # Convert to DataFrame and handle MongoDB specific fields
         df_predictions = pd.DataFrame(predictions)
 
-        # Format for display
+        # Format display columns
         df_predictions['predicted_price_formatted'] = df_predictions['predicted_price'].apply(format_price)
         df_predictions['timestamp'] = pd.to_datetime(df_predictions['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
 
-        # Drop MongoDB _id column
-        df_predictions = df_predictions.drop('_id', axis=1)
+        # Remove MongoDB _id column and display
+        if '_id' in df_predictions.columns:
+            df_predictions = df_predictions.drop('_id', axis=1)
 
         # Display as table
         st.dataframe(

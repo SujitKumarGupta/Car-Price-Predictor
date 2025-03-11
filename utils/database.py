@@ -1,71 +1,83 @@
-import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import pymongo
 from datetime import datetime
 from typing import Dict, List, Any
+import os
+import logging
 
-def get_database_connection():
-    """Get PostgreSQL database connection"""
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# MongoDB connection settings
+MONGO_HOST = "0.0.0.0"
+MONGO_PORT = 27017
+MONGO_DB = "car_price_predictor"
+MONGO_COLLECTION = "predictions"
+
+def get_database():
+    """Get MongoDB database connection"""
     try:
-        return psycopg2.connect(os.environ['DATABASE_URL'])
+        # Connect with a timeout of 5 seconds
+        client = pymongo.MongoClient(
+            f"mongodb://{MONGO_HOST}:{MONGO_PORT}/",
+            serverSelectionTimeoutMS=5000
+        )
+        # Test the connection
+        client.server_info()
+        logger.info("Successfully connected to MongoDB")
+        db = client[MONGO_DB]
+
+        # Create collection if it doesn't exist
+        if MONGO_COLLECTION not in db.list_collection_names():
+            db.create_collection(MONGO_COLLECTION)
+            logger.info(f"Created collection: {MONGO_COLLECTION}")
+
+        return db
     except Exception as e:
-        print(f"Database connection error: {str(e)}")
+        logger.error(f"MongoDB Connection Error: {str(e)}")
         raise
 
 def save_prediction(prediction_data: Dict[str, Any]) -> bool:
-    """Save a prediction to PostgreSQL"""
+    """Save a prediction to MongoDB"""
     try:
-        with get_database_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO predictions (year, mileage, brand, model, predicted_price)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        prediction_data['year'],
-                        prediction_data['mileage'],
-                        prediction_data['brand'],
-                        prediction_data['model'],
-                        prediction_data['predicted_price']
-                    ))
-                conn.commit()
-                return True
+        db = get_database()
+        predictions = db[MONGO_COLLECTION]
+        prediction_data['timestamp'] = datetime.now()
+        result = predictions.insert_one(prediction_data)
+        logger.info(f"Saved prediction with ID: {result.inserted_id}")
+        return bool(result.inserted_id)
     except Exception as e:
-        print(f"Error saving prediction: {str(e)}")
+        logger.error(f"Error saving prediction: {str(e)}")
         return False
 
 def get_predictions(limit: int = 100) -> List[Dict[str, Any]]:
-    """Retrieve predictions from PostgreSQL"""
+    """Retrieve predictions from MongoDB"""
     try:
-        with get_database_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT timestamp, year, mileage, brand, model, predicted_price
-                    FROM predictions
-                    ORDER BY timestamp DESC
-                    LIMIT %s
-                    """, (limit,))
-                return cur.fetchall()
+        db = get_database()
+        predictions = db[MONGO_COLLECTION]
+        return list(predictions.find().sort('timestamp', -1).limit(limit))
     except Exception as e:
-        print(f"Error retrieving predictions: {str(e)}")
+        logger.error(f"Error retrieving predictions: {str(e)}")
         return []
 
 def get_prediction_stats() -> Dict[str, Any]:
     """Get basic statistics about predictions"""
     try:
-        with get_database_connection() as conn:
-            with conn.cursor() as cur:
-                # Get total count
-                cur.execute("SELECT COUNT(*) FROM predictions")
-                total_predictions = cur.fetchone()[0]
+        db = get_database()
+        predictions = db[MONGO_COLLECTION]
+        total = predictions.count_documents({})
 
-                # Get average price
-                cur.execute("SELECT AVG(predicted_price) FROM predictions")
-                avg_price = cur.fetchone()[0] or 0
+        if total > 0:
+            avg_price = list(predictions.aggregate([
+                {'$group': {'_id': None, 'avg': {'$avg': '$predicted_price'}}}
+            ]))[0]['avg']
+        else:
+            avg_price = 0
 
-                return {
-                    'total_predictions': total_predictions,
-                    'avg_price': float(avg_price)
-                }
+        return {
+            'total_predictions': total,
+            'avg_price': avg_price
+        }
     except Exception as e:
-        print(f"Error getting stats: {str(e)}")
+        logger.error(f"Error getting stats: {str(e)}")
         return {'total_predictions': 0, 'avg_price': 0}
