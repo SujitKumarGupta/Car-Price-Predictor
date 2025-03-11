@@ -9,7 +9,7 @@ import os
 
 # Page config
 st.set_page_config(
-    page_title="Car Price Predictor",
+    page_title="Indian Car Price Predictor",
     page_icon="🚗",
     layout="wide"
 )
@@ -25,7 +25,8 @@ if 'predictions' not in st.session_state:
     st.session_state.predictions = []
 
 def main():
-    st.title("🚗 Car Price Predictor")
+    st.title("🚗 Indian Car Price Predictor")
+    st.markdown("Predict used car prices in Indian Rupees (₹)")
 
     try:
         model_data = load_model()
@@ -40,9 +41,15 @@ def main():
     st.sidebar.header("Car Details")
 
     year = st.sidebar.number_input("Year", min_value=1900, max_value=datetime.now().year, value=2020)
-    mileage = st.sidebar.number_input("Mileage", min_value=0, max_value=1000000, value=50000)
-    brand = st.sidebar.selectbox("Brand", ["Toyota", "Honda", "Ford", "BMW", "Mercedes"])
-    car_model = st.sidebar.selectbox("Model", ["Sedan", "SUV", "Truck", "Coupe"])
+    mileage = st.sidebar.number_input("Mileage (km)", min_value=0, max_value=500000, value=50000)
+    brand = st.sidebar.selectbox(
+        "Brand",
+        ["Maruti Suzuki", "Hyundai", "Tata", "Mahindra", "Honda", "Toyota", "Kia", "MG"]
+    )
+    car_model = st.sidebar.selectbox(
+        "Model Type",
+        ["Hatchback", "Sedan", "SUV", "Compact SUV", "MPV", "Luxury"]
+    )
 
     if st.sidebar.button("Predict Price"):
         # Validate input
@@ -80,14 +87,18 @@ def main():
         # Convert predictions to DataFrame
         df_predictions = pd.DataFrame(st.session_state.predictions)
 
+        # Format price column for display
+        df_predictions['predicted_price_formatted'] = df_predictions['predicted_price'].apply(format_price)
+
         # Display as table
-        st.dataframe(df_predictions)
+        st.dataframe(df_predictions[['timestamp', 'year', 'mileage', 'brand', 'model', 'predicted_price_formatted']])
 
         # Create visualization
         fig = px.scatter(df_predictions, x='year', y='predicted_price',
                         color='brand', size='mileage',
                         hover_data=['model', 'timestamp'],
-                        title='Predictions Visualization')
+                        title='Predictions Visualization (in ₹)',
+                        labels={'predicted_price': 'Predicted Price (₹)'})
         st.plotly_chart(fig)
 
         # Save predictions to CSV
