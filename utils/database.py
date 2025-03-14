@@ -17,11 +17,8 @@ MONGO_COLLECTION = "predictions"
 def get_database():
     """Get MongoDB database connection"""
     try:
-        # Connect with a timeout of 5 seconds
-        client = pymongo.MongoClient(
-            f"mongodb://{MONGO_HOST}:{MONGO_PORT}/",
-            serverSelectionTimeoutMS=5000
-        )
+        client = pymongo.MongoClient("mongodb://localhost:27017/")
+
         # Test the connection
         client.server_info()
         logger.info("Successfully connected to MongoDB")
