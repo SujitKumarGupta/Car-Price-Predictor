@@ -22,7 +22,7 @@ def load_model():
         return pickle.load(f)
 
 def main():
-    st.title("🚗 Indian Car Price Predictor")
+    st.title("🚗 Car Price Predictor")
     st.markdown("Predict used car prices in Indian Rupees (₹)")
 
     try:
