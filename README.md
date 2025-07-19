@@ -14,7 +14,7 @@ This application predicts car prices using a Random Forest model with a Streamli
 ## 📸 Screenshots
 
 ### Dashboard View
-![Dashboard](screenshots/Screenshot%202025-07-19%20134926.png)
+![Dashboard](screenshots/Screenshot%202025-07-19%20140425.png)
 
 ### Prediction Result
-![Prediction](screenshots/Screenshot%202025-07-19%20140425.png)
+![Prediction](screenshots/Screenshot%202025-07-19%20134926.png)
